@@ -7,6 +7,24 @@ data class Message(
     val firstName: String
 )
 
+fun extractBodyFromApiGateway(eventJson: String): String {
+    // API Gateway V2 format-dan "body" fieldni extract qilish
+    val bodyRegex = """"body"\s*:\s*"([^"]+(?:\\.[^"]*)*)"(?:\s*,|\s*})""".toRegex()
+    val match = bodyRegex.find(eventJson)
+    
+    if (match != null) {
+        var body = match.groupValues[1]
+        // Escaped characters-ni decode qilish
+        body = body.replace("\\\"", "\"")
+        body = body.replace("\\\\", "\\")
+        body = body.replace("\\n", "\n")
+        return body
+    }
+    
+    // Agar API Gateway V2 format bo'lmasa, to'g'ridan-to'g'ri Telegram JSON bo'ladi
+    return eventJson
+}
+
 fun parseJsonUpdate(jsonString: String): Message? {
     return try {
         val messageIdRegex = """"message_id"\s*:\s*(\d+)""".toRegex()
@@ -49,7 +67,10 @@ fun main(args: Array<String>) {
     
     val eventJson = args[0]
     
-    val message = parseJsonUpdate(eventJson)
+    // API Gateway V2 format-dan Telegram JSON extract qilish
+    val telegramJson = extractBodyFromApiGateway(eventJson)
+    
+    val message = parseJsonUpdate(telegramJson)
     if (message != null) {
         val response = getResponseText(message.text)
         println("{\"statusCode\": 200, \"body\": \"$response\"}")

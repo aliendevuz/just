@@ -5,8 +5,7 @@
 set -e
 
 # Executable path - Lambda container-da
-# HANDLER="${LAMBDA_TASK_ROOT:-.}/helper/bootstrap"
-HANDLER="main.kexe"
+HANDLER="./base.kexe"
 
 echo "[BOOTSTRAP] AWS Lambda Telegram Bot Runtime"
 echo "[BOOTSTRAP] Handler: $HANDLER"
@@ -16,9 +15,6 @@ if [ ! -f "$HANDLER" ]; then
     echo "[ERROR] Handler not found at $HANDLER"
     exit 1
 fi
-
-# Make executable
-chmod +x "$HANDLER"
 
 # Runtime API dan events olish loop
 while true; do
