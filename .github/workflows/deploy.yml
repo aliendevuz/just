@@ -68,6 +68,7 @@ jobs:
             aws lambda update-function-code \
               --function-name "$LAMBDA_FUNCTION_NAME" \
               --zip-file fileb://telegram-bot-lambda.zip \
+              --role "${{ secrets.AWS_LAMBDA_ROLE }}" \
               --region "$AWS_REGION"
           else
             
