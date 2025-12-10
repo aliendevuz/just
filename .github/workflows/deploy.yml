@@ -31,29 +31,21 @@ jobs:
       
       - name: Create Lambda deployment package
         run: |
-          # Working directory yaratish
           mkdir -p lambda_package
           
-          # Bootstrap script-ni copy qilish va executable qilish
           cp bootstrap lambda_package/
           chmod 755 lambda_package/bootstrap
           
-          # Native executable-ni copy qilish
           mkdir -p lambda_package/helper
           cp build/bin/telegram/bootstrapReleaseExecutable/bootstrap lambda_package/helper/bootstrap
           chmod 755 lambda_package/helper/bootstrap
           
-          # Lambda handler wrapper yaratish (agar kerak bo'lsa)
           cd lambda_package
-          
-          # ZIP fayli yaratish
           zip -r ../telegram-bot-lambda.zip bootstrap helper/
-          
           cd ..
-          ls -lah telegram-bot-lambda.zip
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: lambda-package
           path: telegram-bot-lambda.zip
@@ -65,10 +57,9 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
           LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
         run: |
-          # AWS CLI o'rnatish
           pip install awscli
           
-          # Existing function bor-yo'qligini check qilish
+          # Check if function exists
           if aws lambda get-function \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --region "$AWS_REGION" 2>/dev/null; then
@@ -84,8 +75,9 @@ jobs:
             aws lambda create-function \
               --function-name "$LAMBDA_FUNCTION_NAME" \
               --runtime "provided.al2" \
-              --handler "hello.bootstrap" \
+              --handler "bootstrap" \
               --zip-file fileb://telegram-bot-lambda.zip \
+              --role "${{ secrets.AWS_LAMBDA_ROLE }}" \
               --region "$AWS_REGION"
           fi
           
@@ -105,16 +97,10 @@ jobs:
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --environment "Variables={BOT_TOKEN=$BOT_TOKEN}" \
             --region "$AWS_REGION"
-          
-          echo "✅ Environment variables updated!"
       
       - name: Deployment summary
         run: |
           echo "🎉 Deployment Summary"
-          echo "===================="
           echo "Function: ${{ secrets.LAMBDA_FUNCTION_NAME }}"
           echo "Region: ${{ secrets.AWS_REGION }}"
           echo "Package: telegram-bot-lambda.zip"
-          echo ""
-          echo "📝 To set up Telegram webhook:"
-          echo "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<API_GATEWAY_URL>"
