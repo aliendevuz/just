@@ -5,7 +5,8 @@
 set -e
 
 # Executable path - Lambda container-da
-HANDLER="${LAMBDA_TASK_ROOT:-.}/helper/bootstrap"
+# HANDLER="${LAMBDA_TASK_ROOT:-.}/helper/bootstrap"
+HANDLER="main.kexe"
 
 echo "[BOOTSTRAP] AWS Lambda Telegram Bot Runtime"
 echo "[BOOTSTRAP] Handler: $HANDLER"

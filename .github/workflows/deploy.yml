@@ -37,11 +37,11 @@ jobs:
           chmod 755 lambda_package/bootstrap
           
           mkdir -p lambda_package/helper
-          cp build/bin/telegram/bootstrapReleaseExecutable/bootstrap lambda_package/helper/bootstrap
-          chmod 755 lambda_package/helper/bootstrap
+          cp build/bin/telegram/bootstrapReleaseExecutable/bootstrap.kexe lambda_package/main.kexe
+          chmod 755 lambda_package/main.kexe
           
           cd lambda_package
-          zip -r ../telegram-bot-lambda.zip bootstrap helper/
+          zip -r ../telegram-bot-lambda.zip bootstrap main.kexe
           cd ..
       
       - name: Upload artifact
