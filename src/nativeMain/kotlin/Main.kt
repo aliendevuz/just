@@ -32,66 +32,82 @@ fun base64Decode(input: String): String {
     return output.toString()
 }
 
+fun unescapeJsonString(escaped: String): String {
+    var result = escaped
+    
+    // Order matters! Process in correct sequence
+    // 1. First, handle escaped backslashes
+    result = result.replace("\\\\", "\u0000")  // temporary placeholder for \\
+    
+    // 2. Then handle other escaped sequences
+    result = result.replace("\\\"", "\"")
+    result = result.replace("\\n", "\n")
+    result = result.replace("\\r", "\r")
+    result = result.replace("\\t", "\t")
+    result = result.replace("\\/", "/")
+    result = result.replace("\\b", "\b")
+    
+    // 3. Finally, restore backslashes
+    result = result.replace("\u0000", "\\")
+    
+    return result
+}
+
 fun extractBodyFromApiGateway(eventJson: String): String {
-    val bodyRegex = """"body"\s*:\s*"([^"]*)"""".toRegex()
+    // API Gateway HTTP API (v2) formatidan body ni olish
+    // Pattern: "body":"value" where value can have escaped characters
+    val bodyRegex = """"body"\s*:\s*"((?:[^"\\]|\\.)*?)"""".toRegex()
     val base64Regex = """"isBase64Encoded"\s*:\s*(true|false)""".toRegex()
 
-    val body = bodyRegex.find(eventJson)?.groupValues?.get(1) ?: return eventJson
-    val isBase64 = base64Regex.find(eventJson)?.groupValues?.get(1)?.toBoolean() ?: false
+    val bodyEscaped = bodyRegex.find(eventJson)?.groupValues?.get(1)
+        ?: return eventJson
 
-    return if (isBase64) base64Decode(body) else body
+    val isBase64 = base64Regex.find(eventJson)?.groupValues?.get(1)?.toBooleanStrictOrNull() ?: false
+
+    if (isBase64) {
+        return base64Decode(bodyEscaped.replace("\n", "").replace("\r", ""))
+    }
+
+    // Escaped JSON stringni to'g'ri ochish
+    return unescapeJsonString(bodyEscaped)
 }
 
 fun parseJsonUpdate(jsonString: String): Message? {
-    val messageIdRegex = """"message_id"\s*:\s*(\d+)""".toRegex(RegexOption.MULTILINE)
-    val chatIdRegex    = """"chat"\s*:\s*\{\s*"id"\s*:\s*(\d+)""".toRegex(RegexOption.MULTILINE)
-    val textRegex      = """"text"\s*:\s*"([^"]+)""".toRegex(RegexOption.MULTILINE)
-    val firstNameRegex = """"first_name"\s*:\s*"([^"]+)""".toRegex(RegexOption.MULTILINE)
+    // Regex patterns to extract fields from JSON
+    val messageIdRegex = """"message_id"\s*:\s*(\d+)""".toRegex()
+    val chatIdRegex    = """"id"\s*:\s*(\d+)""".toRegex()
+    val textRegex      = """"text"\s*:\s*"((?:[^"\\]|\\.)*?)"""".toRegex()
+    val firstNameRegex = """"first_name"\s*:\s*"((?:[^"\\]|\\.)*?)"""".toRegex()
 
-    val chatId = chatIdRegex.find(jsonString)?.groupValues?.get(1)?.toLongOrNull() ?: return null
-    val messageId = messageIdRegex.find(jsonString)?.groupValues?.get(1)?.toIntOrNull() ?: return null
-    val text = textRegex.find(jsonString)?.groupValues?.get(1) ?: return null
-    val firstName = firstNameRegex.find(jsonString)?.groupValues?.get(1) ?: "User"
+    // message_id ni olish
+    val messageId = messageIdRegex.find(jsonString)?.groupValues?.get(1)?.toIntOrNull() 
+        ?: return null
+
+    // "chat" blockini topish va uning ichidan "id" ni olish
+    val chatBlock = """"chat"\s*:\s*\{[^}]+}""".toRegex().find(jsonString)?.value 
+    
+    val chatId = if (chatBlock != null) {
+        chatIdRegex.find(chatBlock)?.groupValues?.get(1)?.toLongOrNull()
+    } else {
+        null
+    } ?: return null
+    
+    // text ni olish
+    val textMatchRaw = textRegex.find(jsonString)?.groupValues?.get(1) 
+        ?: return null
+    
+    val text = unescapeJsonString(textMatchRaw)
+    
+    // first_name ni olish (ixtiyoriy)
+    val firstNameMatchRaw = firstNameRegex.find(jsonString)?.groupValues?.get(1)
+    val firstName = if (firstNameMatchRaw != null) {
+        unescapeJsonString(firstNameMatchRaw)
+    } else {
+        "User"
+    }
 
     return Message(messageId, chatId, text, firstName)
 }
-
-
-// fun extractBodyFromApiGateway(eventJson: String): String {
-//     // API Gateway V2 format-dan "body" fieldni extract qilish
-//     val bodyRegex = """"body"\s*:\s*"([^"]+(?:\\.[^"]*)*)"(?:\s*,|\s*})""".toRegex()
-//     val match = bodyRegex.find(eventJson)
-    
-//     if (match != null) {
-//         var body = match.groupValues[1]
-//         // Escaped characters-ni decode qilish
-//         body = body.replace("\\\"", "\"")
-//         body = body.replace("\\\\", "\\")
-//         body = body.replace("\\n", "\n")
-//         return body
-//     }
-    
-//     // Agar API Gateway V2 format bo'lmasa, to'g'ridan-to'g'ri Telegram JSON bo'ladi
-//     return eventJson
-// }
-
-// fun parseJsonUpdate(jsonString: String): Message? {
-//     return try {
-//         val messageIdRegex = """"message_id"\s*:\s*(\d+)""".toRegex()
-//         val chatIdRegex = """"id"\s*:\s*(\d+)""".toRegex()
-//         val textRegex = """"text"\s*:\s*"([^"]+)""".toRegex()
-//         val firstNameRegex = """"first_name"\s*:\s*"([^"]+)""".toRegex()
-        
-//         val chatId = chatIdRegex.find(jsonString)?.groupValues?.get(1)?.toLongOrNull() ?: return null
-//         val messageId = messageIdRegex.find(jsonString)?.groupValues?.get(1)?.toIntOrNull() ?: return null
-//         val text = textRegex.find(jsonString)?.groupValues?.get(1) ?: return null
-//         val firstName = firstNameRegex.find(jsonString)?.groupValues?.get(1) ?: "User"
-        
-//         Message(messageId, chatId, text, firstName)
-//     } catch (e: Exception) {
-//         null
-//     }
-// }
 
 fun getResponseText(text: String): String {
     return when {
@@ -102,25 +118,24 @@ fun getResponseText(text: String): String {
     }
 }
 
-// ============ Telegram Message Processing ============
-
-// ============ Main Entry Point ============
-
 const val BOT_TOKEN = "7605219483:AAGDHcc-MKlH3fJLQkkJh1TSXkc5h-vArOo"
 
 fun main(args: Array<String>) {
-    // Argument-dan event JSON olish (bootstrap script-dan)
     if (args.isEmpty()) {
         println("{\"statusCode\": 400, \"body\": \"No event provided\"}")
         return
     }
     
-    val eventJson = args[0]
+    var eventJson = args[0]
+    
+    // Agar event string escaped bo'lsa (environment variable orqali o'tsa), ochish
+    eventJson = unescapeJsonString(eventJson)
     
     // API Gateway V2 format-dan Telegram JSON extract qilish
     val telegramJson = extractBodyFromApiGateway(eventJson)
     
     val message = parseJsonUpdate(telegramJson)
+    
     if (message != null) {
         val response = getResponseText(message.text)
         println("{\"statusCode\": 200, \"body\": \"$response\"}")
