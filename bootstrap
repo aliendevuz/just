@@ -1,0 +1,50 @@
+#!/bin/bash
+# AWS Lambda Custom Runtime Bootstrap
+# Lambda Runtime API dan events olish va handler-ga argument orqali pass qilish
+
+set -e
+
+# Executable path - Lambda container-da
+HANDLER="${LAMBDA_TASK_ROOT:-.}/helper/bootstrap"
+
+echo "[BOOTSTRAP] AWS Lambda Telegram Bot Runtime"
+echo "[BOOTSTRAP] Handler: $HANDLER"
+
+# Check handler exists
+if [ ! -f "$HANDLER" ]; then
+    echo "[ERROR] Handler not found at $HANDLER"
+    exit 1
+fi
+
+# Make executable
+chmod +x "$HANDLER"
+
+# Runtime API dan events olish loop
+while true; do
+    echo "[BOOTSTRAP] Waiting for next event..."
+    
+    # Lambda Runtime API endpoint
+    NEXT_EVENT_URL="http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/next"
+    
+    # Event va request ID olish
+    RESPONSE=$(curl -s -D /tmp/headers.txt "$NEXT_EVENT_URL" 2>/dev/null || echo "{}")
+    REQUEST_ID=$(grep -i "Lambda-Runtime-Aws-Request-Id:" /tmp/headers.txt 2>/dev/null | cut -d: -f2 | tr -d ' \r\n' || echo "unknown")
+    
+    echo "[BOOTSTRAP] Got request: $REQUEST_ID"
+    echo "[BOOTSTRAP] Event: $(echo "$RESPONSE" | head -c 100)..."
+    
+    # Event-ni handler-ga ARGUMENT orqali pass qilish
+    OUTPUT=$("$HANDLER" "$RESPONSE" 2>&1 || echo '{"statusCode": 500, "body": "Handler error"}')
+    
+    echo "[BOOTSTRAP] Handler output: $OUTPUT"
+    
+    # Response API-ga send qilish
+    RESPONSE_URL="http://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/$REQUEST_ID/response"
+    
+    curl -X POST \
+        -H "Content-Type: application/json" \
+        -d "$OUTPUT" \
+        "$RESPONSE_URL" 2>/dev/null || echo "[BOOTSTRAP] Failed to send response"
+    
+    echo "[BOOTSTRAP] ✓ Response sent for $REQUEST_ID"
+done

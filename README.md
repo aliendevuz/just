@@ -1,22 +1,110 @@
 [![official JetBrains project](https://jb.gg/badges/official-plastic.svg)](https://confluence.jetbrains.com/display/ALL/JetBrains+on+GitHub)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0-blue.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 
-# Kotlin/Native Template
+# Telegram Bot - Kotlin/Native Webhook Handler
 
-A mostly-empty template to get started creating a Kotlin/Native project. 
+Sof Kotlin/Native - hech qanday framework yo'q. Faqat webhook handler.
 
-## Getting Started
+## 🚀 Build
 
-1. On the project page, click on the `Use this template` button
-2. Click on the `Create a new repository` drop-down item
-3. Fill in the details of the new repository you'll be creating under your account
-4. Click the `Create repository` button
-5. Browse to your repository and make the needed changes there.
+```bash
+./gradlew buildBootstrap
+```
 
-## Code of conduct
+**Output**: `build/bin/telegram/releaseExecutable/bootstrap`
 
-Please read [our code of conduct](https://github.com/jetbrains#code-of-conduct).
+## 🔧 Setup
 
-## License
+1. **Token**: `src/nativeMain/kotlin/Main.kt` faylida BOT_TOKEN o'rnating
+2. **Compile**: `./gradlew buildBootstrap`
+3. **Deploy**: Bootstrap faylni serverga yuklang
+4. **Webhook**: Telegram-ga webhook URL registr qiling
 
-The [kmp-native-wizard template](https://github.com/Kotlin/kmp-native-wizard/) is licensed under [CC0](https://creativecommons.org/publicdomain/zero/1.0/deed.en).
+## 📝 Komandalari
+
+- `/start` - Salomlashish
+- `/help` - Yordam
+- `/echo TEXT` - Ekho
+- Boshqa - Info
+
+## 🧪 Test
+
+```bash
+./gradlew buildBootstrap
+./build/bin/telegram/releaseExecutable/bootstrap --test
+```
+
+---
+
+**Minimal Kotlin/Native webhook bot**
+
+## 🚀 Tez Boshlash
+
+### 1. Bot Tokenini Olish
+1. Telegram-da `@BotFather`-ga xabar yuboring
+2. `/newbot` buyrug'ini kiritib yangi bot yarating
+3. Bot tokenini copy qiling
+
+### 2. Kodni Sozlash
+`src/jvmMain/kotlin/TelegramBot.kt` faylida tokenni o'rnating:
+```kotlin
+const val BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+```
+
+### 3. Build Qilish
+```bash
+./gradlew createFatJar
+```
+
+Output: `build/libs/telegram-bot-fat.jar`
+
+### 4. Serverda Run Qilish
+
+#### Local test uchun:
+```bash
+java -jar build/libs/telegram-bot-fat.jar
+```
+
+Server quyidagi portlarda ishga tushadi:
+- **HTTP**: `http://localhost:8080`
+- **Webhook**: `http://localhost:8080/webhook`
+- **Health**: `http://localhost:8080/health`
+
+### 5. Test Qilish
+
+```bash
+# Webhook-ni check qilish
+curl http://localhost:8080/health
+
+# Response:
+# {"status":"alive","bot":"Telegram"}
+```
+
+## 📋 Bot Komandalari
+
+| Buyruq | Tarif |
+|--------|-------|
+| `/start` | Salomlashish |
+| `/help` | Yordam ko'rsatish |
+| Boshqa xabarlar | Echo orqali qaytarish |
+
+## 📁 Fayl Tuzilishi
+
+```
+src/jvmMain/kotlin/
+├── TelegramModels.kt    # Data classes
+└── TelegramBot.kt       # Main bot handler
+```
+
+## ✨ Features
+
+✅ Webhook-based (polling yo'q)
+✅ Minimal va tez
+✅ Error handling
+✅ Logging
+✅ Async support
+
+---
+
+Telegram bot-ingizni boshlang! 🚀
+

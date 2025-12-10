@@ -1,0 +1,120 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      
+      - name: Build Kotlin/Native executable
+        run: |
+          chmod +x ./gradlew
+          ./gradlew buildBootstrap
+      
+      - name: Verify build output
+        run: |
+          ls -lah build/bin/telegram/bootstrapReleaseExecutable/
+      
+      - name: Create Lambda deployment package
+        run: |
+          # Working directory yaratish
+          mkdir -p lambda_package
+          
+          # Bootstrap script-ni copy qilish va executable qilish
+          cp bootstrap lambda_package/
+          chmod 755 lambda_package/bootstrap
+          
+          # Native executable-ni copy qilish
+          mkdir -p lambda_package/helper
+          cp build/bin/telegram/bootstrapReleaseExecutable/bootstrap lambda_package/helper/bootstrap
+          chmod 755 lambda_package/helper/bootstrap
+          
+          # Lambda handler wrapper yaratish (agar kerak bo'lsa)
+          cd lambda_package
+          
+          # ZIP fayli yaratish
+          zip -r ../telegram-bot-lambda.zip bootstrap helper/
+          
+          cd ..
+          ls -lah telegram-bot-lambda.zip
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: lambda-package
+          path: telegram-bot-lambda.zip
+      
+      - name: Deploy to AWS Lambda
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
+        run: |
+          # AWS CLI o'rnatish
+          pip install awscli
+          
+          # Existing function bor-yo'qligini check qilish
+          if aws lambda get-function \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" 2>/dev/null; then
+            
+            echo "📦 Function exists, updating code..."
+            aws lambda update-function-code \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --zip-file fileb://telegram-bot-lambda.zip \
+              --region "$AWS_REGION"
+          else
+            
+            echo "🆕 Creating new Lambda function..."
+            aws lambda create-function \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --runtime "provided.al2" \
+              --handler "hello.bootstrap" \
+              --zip-file fileb://telegram-bot-lambda.zip \
+              --region "$AWS_REGION"
+          fi
+          
+          echo "✅ Deployment complete!"
+      
+      - name: Update Lambda environment variables
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          LAMBDA_FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          pip install awscli
+          
+          aws lambda update-function-configuration \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --environment "Variables={BOT_TOKEN=$BOT_TOKEN}" \
+            --region "$AWS_REGION"
+          
+          echo "✅ Environment variables updated!"
+      
+      - name: Deployment summary
+        run: |
+          echo "🎉 Deployment Summary"
+          echo "===================="
+          echo "Function: ${{ secrets.LAMBDA_FUNCTION_NAME }}"
+          echo "Region: ${{ secrets.AWS_REGION }}"
+          echo "Package: telegram-bot-lambda.zip"
+          echo ""
+          echo "📝 To set up Telegram webhook:"
+          echo "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=<API_GATEWAY_URL>"
